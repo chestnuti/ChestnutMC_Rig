@@ -1,0 +1,134 @@
+import bpy
+
+Rig_Parameters_bones = {
+    "meum.body.setting": "General Setting",
+    "meum.face.mouth.setting": "Face Setting",
+    "meum.arm.setting.R": "Right Arm Setting",
+    "meum.arm.setting.L": "Left Arm Setting",
+    "meum.leg.setting.R": "Right Leg Setting",
+    "meum.leg.setting.L": "Left Leg Setting"
+}
+
+Face_Parameters_nodes = {
+    "Skin": ["Adjuster", "Face Texture", "FaceImageMix"],
+    "Face": ["ChestnutMC_EyeShader", "SkinSorter"],
+    "Mouth": ["ChestnutMC_Mouth"],
+    "EdgeLight": ["ChestnutMC_EdgeLight"]
+}
+
+
+
+# 骨骼参数绘制方法
+def get_rig_parameters(box, context: bpy.types.Context, bone_name: str):
+    # 验证活动物体为骨骼
+    armature = None
+    if context.active_object.type != "ARMATURE":
+        if context.active_object.parent is not None and context.active_object.parent.type == "ARMATURE":
+            armature = context.active_object.parent
+    elif context.active_object.type == "ARMATURE":
+        armature = context.active_object
+    if armature is None:
+        return None
+
+    # 验证骨骼是否存在
+    try:
+        bone = armature.pose.bones[bone_name]
+    except:
+        return None
+
+    # 面板展开与收起
+    row = box.row()
+    row.prop(bone, "cmc_bone_expand",
+                icon="TRIA_DOWN" if bone.cmc_bone_expand else "TRIA_RIGHT",
+                text="",
+                emboss=False)
+    row.label(text=Rig_Parameters_bones[bone_name], icon="POSE_HLT")
+    if bone.cmc_bone_expand is False:
+        return None
+
+    # 获取自定义属性
+    custom_props = bone.keys()
+    # 绘制参数
+    for prop_name in custom_props:
+        # 验证属性值是否为数字
+        if type(bone[prop_name]) not in [int, float]:
+            continue
+        if prop_name == "cmc_bone_expand":
+            continue
+        row = box.row()
+        row.prop(bone, '["%s"]' % prop_name, text=prop_name)
+
+
+# 面部参数绘制方法
+def get_face_parameters(box, context: bpy.types.Context, material_name: str):
+    material = None
+    # 验证活动物体是否为mesh
+    if context.active_object.type == 'MESH':
+        # 验证名称前缀是否为"preview"
+        if context.active_object.name.startswith("preview"):
+            for material in context.active_object.material_slots:
+                if material.material.name.startswith(material_name):
+                    material = material.material
+                    break
+        else:
+            # 获取父级骨骼
+            parent_armature = None
+            if context.active_object.parent is not None:
+                parent_armature = context.active_object.parent
+                if parent_armature and parent_armature.type == 'ARMATURE':
+                    # 获取父级骨骼中名为"preview"的子物体
+                    for child in parent_armature.children:
+                        if child.type == 'MESH' and child.name.startswith("preview"):
+                            for material in child.material_slots:
+                                if material.material.name.startswith(material_name):
+                                    material = material.material
+                                    break
+    elif context.active_object.type == 'ARMATURE':
+        # 获取骨骼中名为"preview"的子物体
+        for child in context.active_object.children:
+            if child.type == 'MESH' and child.name.startswith("preview"):
+                for material in child.material_slots:
+                    if material.material.name.startswith(material_name):
+                        material = material.material
+                        break
+
+    if material is None:
+        return None
+
+    # 在材质节点树中找到对应节点
+    for node in material.node_tree.nodes:
+        if node.name in Face_Parameters_nodes[material_name]:
+            row = box.row()
+            # 面板展开与收起
+            row.prop(node, "cmc_node_expand",
+                icon="TRIA_DOWN" if node.cmc_node_expand else "TRIA_RIGHT",
+                text="",
+                emboss=False)
+            row.label(text=node.name)
+            if node.cmc_node_expand is False:
+                continue
+
+            newbox = box.box()
+            # 如果节点有输入(非图像节点)，则展示未连接节点
+            if len(node.inputs) > 1:
+                for inp in node.inputs:
+                    # 如果节点被连接
+                    if inp.is_linked:
+                        continue
+                    else:
+                        newbox.template_node_view(material.node_tree, node, inp)
+            # 若为图像节点，则展示节点
+            elif node.type == 'TEX_IMAGE':
+                newbox.prop(node, "image")
+            # 如果节点无输入则进入节点组(Adjuster)
+            else:
+                node_tree = bpy.data.node_groups.get(node.node_tree.name)
+                for out in node_tree.nodes['组输出'].inputs:
+                    # 如果节点有输入
+                    if out.is_linked:
+                        row = newbox.row()
+                        row.alignment = 'RIGHT'
+                        row.label(text=out.name)
+                        row.label(text="Custom Used", icon= "SETTINGS")
+                    else:
+                        newbox.template_node_view(node_tree, node, out)
