@@ -116,9 +116,14 @@ class RigPropertiesPanel(BasePanel, bpy.types.Panel):
         armature = None
         if context.active_object and context.active_object.type != "ARMATURE":
             if context.active_object.parent is not None and context.active_object.parent.type == "ARMATURE":
-                armature = context.active_object.parent
+                for child in context.active_object.parent.children:
+                    if child.name.startswith("preview"):
+                        armature = context.active_object.parent
         elif context.active_object and context.active_object.type == "ARMATURE":
-            armature = context.active_object
+            if context.active_object.children:
+                for child in context.active_object.children:
+                    if child.name.startswith("preview"):
+                        armature = context.active_object
         if armature is not None:
             box  = layout.box()
             get_rig_parameters(box, context, "meum.body.setting")
