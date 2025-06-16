@@ -1,4 +1,5 @@
 import bpy
+from ..operators import AddonOperators
 
 Rig_Parameters_bones = {
     "meum.body.setting": "General Setting",
@@ -43,6 +44,7 @@ def get_rig_parameters(box, context: bpy.types.Context, bone_name: str):
                 text="",
                 emboss=False)
     row.label(text=Rig_Parameters_bones[bone_name], icon="POSE_HLT")
+    # 面板展开与收起
     if bone.cmc_bone_expand is False:
         return None
 
@@ -57,6 +59,31 @@ def get_rig_parameters(box, context: bpy.types.Context, bone_name: str):
             continue
         row = box.row()
         row.prop(bone, '["%s"]' % prop_name, text=prop_name)
+
+    if bone.name == "meum.arm.setting.L":
+        row = box.row()
+        if bone["FK/IK"] == 0:
+            row.operator("cmc.switch_l_arm_fkik", text="Seamless FK->IK", icon="MODIFIER")
+        else:
+            row.operator("cmc.switch_l_arm_fkik", text="Seamless IK->FK", icon="MODIFIER")
+    elif bone.name == "meum.arm.setting.R":
+        row = box.row()
+        if bone["FK/IK"] == 0:
+            row.operator("cmc.switch_r_arm_fkik", text="Seamless FK->IK", icon="MODIFIER")
+        else:
+            row.operator("cmc.switch_r_arm_fkik", text="Seamless IK->FK", icon="MODIFIER")
+    elif bone.name == "meum.leg.setting.L":
+        row = box.row()
+        if bone["FK/IK"] == 0:
+            row.operator("cmc.switch_l_leg_fkik", text="Seamless FK->IK", icon="MODIFIER")
+        else:
+            row.operator("cmc.switch_l_leg_fkik", text="Seamless IK->FK", icon="MODIFIER")
+    elif bone.name == "meum.leg.setting.R":
+        row = box.row()
+        if bone["FK/IK"] == 0:
+            row.operator("cmc.switch_r_leg_fkik", text="Seamless FK->IK", icon="MODIFIER")
+        else:
+            row.operator("cmc.switch_r_leg_fkik", text="Seamless IK->FK", icon="MODIFIER")
 
 
 # 面部参数绘制方法

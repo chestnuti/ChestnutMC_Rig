@@ -22,6 +22,19 @@ dictionary = {
         ("Operator", "Import ChestnutMC Rig"): "导入栗籽人模",
         ("Operator", "Load Libraries"): "加载资产库",
         ("Operator", "Reload Libraries"): "重新加载资产库",
+        ("*", "General Setting"):  "常规设置",
+        ("*", "Face Setting"):  "脸部设置",
+        ("*", "Right Arm Setting"):  "右手设置",
+        ("*", "Left Arm Setting"):  "左手设置",
+        ("*", "Right Leg Setting"):  "右脚设置",
+        ("*", "Left Leg Setting"):  "左脚设置",
+        ("*", "Adjuster"):  "材质调整器",
+        ("*", "Face Texture"):  "脸部贴图",
+        ("*", "FaceImageMix"):  "脸部贴图混合",
+        ("*", "ChestnutMC_EyeShader"): "眼睛材质",
+        ("*", "SkinSorter"): "五官材质",
+        ("*", "ChestnutMC_Mouth"): "嘴巴材质",
+        ("*", "ChestnutMC_EdgeLight"): "边缘光",
     }
 }
 

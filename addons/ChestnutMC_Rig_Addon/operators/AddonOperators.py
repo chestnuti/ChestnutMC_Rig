@@ -7,7 +7,11 @@ import struct
 from ..config import __addon_name__
 from ..panels.ImageManager import *
 
-#******************** 读取方法 ********************
+
+#*****************************************************
+#********************* 读取方法 ***********************
+#*****************************************************
+
 def read_skin_json(self):
     addon_prefs = bpy.context.preferences.addons[__addon_name__].preferences
 
@@ -31,7 +35,10 @@ def search_skin_preset(json, skin_name):
     return None
 
 
-#******************** 加载资产库操作 ********************
+
+#*****************************************************
+#******************* 加载资产库操作 *******************
+#*****************************************************
 class CHESTNUTMC_OT_LoadLibraryOperator(bpy.types.Operator):
     '''Load Library Assets'''
     bl_idname = "cmc.load_library"
@@ -117,8 +124,9 @@ class CHESTNUTMC_OT_LoadLibraryOperator(bpy.types.Operator):
 
 
 
-
+#*****************************************************
 #******************** 人模相关操作 ********************
+#*****************************************************
 # 导入人模
 class CHESTNUTMC_OT_RigImportOperator(bpy.types.Operator):
     '''Import ChestnutMC Rig'''
@@ -247,7 +255,9 @@ class CHESTNUTMC_OT_UpdateRigPreview(bpy.types.Operator):
         return {'FINISHED'}
 
 
+#*****************************************************
 #******************** 皮肤相关操作 ********************
+#*****************************************************
 # 添加皮肤
 class CHESTNUTMC_OT_SkinAdd(bpy.types.Operator):
     bl_idname = "cmc.skin_add"
@@ -865,3 +875,246 @@ class CHESTNUTMC_OT_SaveFace2Skin(bpy.types.Operator):
 
         self.report({'ERROR'}, "Failed to save skin preset.")
         return {'CANCELLED'}
+
+
+
+#*****************************************************
+#******************** 骨骼相关操作 ********************
+#*****************************************************
+# ik/fk无缝切换
+class CMC_OT_Switch_IK_FK(bpy.types.Operator):
+    """Switch IK/FK"""
+    bl_idname = "cmc.switch_ik_fk"
+    bl_label = "Switch IK/FK"
+    bl_description = "Switch IK/FK"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    # 复制骨骼变换
+    def copy_transform(self, context: bpy.types.Context, bone_name: str, aim_bone_name: str):
+        armature = context.active_object
+        # 复制变换
+        bone = context.active_object.pose.bones[bone_name]
+        aim_bone = context.active_object.pose.bones[aim_bone_name]
+        # 为骨骼添加复制变换约束
+        constraint = bone.constraints.new("COPY_TRANSFORMS")
+        constraint.target = context.active_object
+        constraint.subtarget = aim_bone_name
+        # 应用约束
+        armature.data.bones.active = bone.bone
+        bpy.ops.constraint.apply(constraint=constraint.name, owner='BONE')
+
+    # 手臂FK转IK
+    def arm_fk2ik(self, context: bpy.types.Context, side: str):
+        if side != "L" and side != "R":
+            return False
+        ik_bone_name = "IK.arm." + side
+        aim_bone_name = "FK2IK.arm." + side
+        meum_bone_name = "meum.arm.setting." + side
+        pole_bone_name = "IK_Pole.arm." + side
+
+        CMC_OT_Switch_IK_FK.copy_transform(self, context, ik_bone_name, aim_bone_name)
+
+        # 切换ikfk参数
+        for bone in context.active_object.pose.bones:
+            if bone.name == meum_bone_name:
+                bone["FK/IK"] = 1
+                bone["IK极向独立控制"] = 0
+            if bone.name == pole_bone_name:
+                # 极向变换归零
+                bone.rotation_euler = (0, 0, 0)
+                bone.location = (0, 0, 0)
+                bone.scale = (1, 1, 1)
+        return True
+
+    # 手臂IK转FK
+    def arm_ik2fk(self, context: bpy.types.Context, side: str):
+        if side != "L" and side != "R":
+            return False
+        bones_name = ["control.upper_arm." + side, "control.lower_arm." + side]
+        aim_bones_name = ["IK2FK.upper_arm." + side, "IK2FK.lower_arm." + side]
+        meum_bone_name = "meum.arm.setting." + side
+
+        for i, bone_name in enumerate(bones_name):
+            CMC_OT_Switch_IK_FK.copy_transform(self, context, bone_name, aim_bones_name[i])
+
+        # 切换ikfk参数
+        for bone in context.active_object.pose.bones:
+            if bone.name == meum_bone_name:
+                bone["FK/IK"] = 0
+                context.active_bone.hide = False
+        return True
+
+    # 腿FK转IK
+    def leg_fk2ik(self, context: bpy.types.Context, side: str):
+        if side != "L" and side != "R":
+            return False
+        ik_bone_name = "IK.leg." + side
+        aim_bone_name = "FK2IK.leg." + side
+        meum_bone_name = "meum.leg.setting." + side
+        pole_bone_name = "IK_Pole.leg." + side
+
+        CMC_OT_Switch_IK_FK.copy_transform(self, context, ik_bone_name, aim_bone_name)
+
+        # 切换ikfk参数
+        for bone in context.active_object.pose.bones:
+            if bone.name == meum_bone_name:
+                bone["FK/IK"] = 1
+                bone["IK极向独立控制"] = 0
+            if bone.name == pole_bone_name:
+                # 极向变换归零
+                bone.rotation_euler = (0, 0, 0)
+                bone.location = (0, 0, 0)
+                bone.scale = (1, 1, 1)
+        return True
+
+    # 腿IK转FK
+    def leg_ik2fk(self, context: bpy.types.Context, side: str):
+        if side != "L" and side != "R":
+            return False
+        bones_name = ["control.upper_leg." + side, "control.lower_leg." + side]
+        aim_bones_name = ["IK2FK.upper_leg." + side, "IK2FK.lower_leg." + side]
+        meum_bone_name = "meum.leg.setting." + side
+        ik_bone_name = "IK.leg." + side
+        feet_bone_name = "control.feet." + side
+
+        for i, bone_name in enumerate(bones_name):
+            CMC_OT_Switch_IK_FK.copy_transform(self, context, bone_name, aim_bones_name[i])
+
+        # 复制ik控制骨变换至脚踝
+        CMC_OT_Switch_IK_FK.copy_transform(self, context, feet_bone_name, ik_bone_name)
+
+        # 切换ikfk参数
+        for bone in context.active_object.pose.bones:
+            if bone.name == meum_bone_name:
+                bone["FK/IK"] = 0
+                context.active_bone.hide = False
+        return True
+
+
+    @classmethod
+    def poll(cls, context: bpy.types.Context):
+        return True
+
+    def execute(self, context: bpy.types.Context):
+        return {'FINISHED'}
+
+
+# 右手手臂fkik调用方法
+class CMC_OT_Switch_R_ARM_FKIK(bpy.types.Operator):
+    bl_idname = "cmc.switch_r_arm_fkik"
+    bl_label = "Seamless switch FK/IK"
+    bl_description = "Seamless switch right arm FK/IK"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context: bpy.types.Context):
+        if context.mode != "POSE":
+            return False
+        return True
+
+    def execute(self, context: bpy.types.Context):
+        meum_bone = context.object.pose.bones["meum.arm.setting.R"]
+        # fk2ik
+        if meum_bone["FK/IK"] == 0:
+            if CMC_OT_Switch_IK_FK.arm_fk2ik(self, context, "R"):
+                return {'FINISHED'}
+            else:
+                self.report({'ERROR'}, "Fail to switch arm FK to IK")
+                return {'CANCELLED'}
+        # ik2fk
+        elif meum_bone["FK/IK"] == 1:
+            if CMC_OT_Switch_IK_FK.arm_ik2fk(self, context, "R"):
+                return {'FINISHED'}
+            else:
+                self.report({'ERROR'}, "Fail to switch arm IK to FK")
+                return {'CANCELLED'}
+
+# 左手手臂fkik调用方法
+class CMC_OT_Switch_L_ARM_FKIK(bpy.types.Operator):
+    bl_idname = "cmc.switch_l_arm_fkik"
+    bl_label = "Seamless switch FK/IK"
+    bl_description = "Seamless switch left arm FK/IK"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context: bpy.types.Context):
+        if context.mode != "POSE":
+            return False
+        return True
+
+    def execute(self, context: bpy.types.Context):
+        meum_bone = context.object.pose.bones["meum.arm.setting.L"]
+        # fk2ik
+        if meum_bone["FK/IK"] == 0:
+            if CMC_OT_Switch_IK_FK.arm_fk2ik(self, context, "L"):
+                return {'FINISHED'}
+            else:
+                self.report({'ERROR'}, "Fail to switch arm FK to IK")
+                return {'CANCELLED'}
+        # ik2fk
+        elif meum_bone["FK/IK"] == 1:
+            if CMC_OT_Switch_IK_FK.arm_ik2fk(self, context, "L"):
+                return {'FINISHED'}
+            else:
+                self.report({'ERROR'}, "Fail to switch arm IK to FK")
+                return {'CANCELLED'}
+
+# 右腿腿部fkik调用方法
+class CMC_OT_Switch_R_LEG_FKIK(bpy.types.Operator):
+    bl_idname = "cmc.switch_r_leg_fkik"
+    bl_label = "Switch Right Leg FK/IK"
+    bl_description = "Switch Right Leg FK/IK"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context: bpy.types.Context):
+        if context.mode != "POSE":
+            return False
+        return True
+
+    def execute(self, context):
+        meum_bone = context.object.pose.bones["meum.leg.setting.R"]
+        # fk2ik
+        if meum_bone["FK/IK"] == 0:
+            if CMC_OT_Switch_IK_FK.leg_fk2ik(self, context, "R"):
+                return {"FINISHED"}
+            else:
+                self.report({"ERROR"}, "Fail to switch leg FK to IK")
+                return {"CANCELLED"}
+        # ik2fk
+        if meum_bone["FK/IK"] == 1:
+            if CMC_OT_Switch_IK_FK.leg_ik2fk(self, context, "R"):
+                return {"FINISHED"}
+            else:
+                self.report({"ERROR"}, "Fail to switch leg IK to FK")
+                return {"CANCELLED"}
+
+# 左腿腿部fkik调用方法
+class CMC_OT_Switch_L_LEG_FKIK(bpy.types.Operator):
+    bl_idname = "cmc.switch_l_leg_fkik"
+    bl_label = "Switch left Leg FK/IK"
+    bl_description = "Switch left Leg FK/IK"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context: bpy.types.Context):
+        if context.mode != "POSE":
+            return False
+        return True
+
+    def execute(self, context):
+        meum_bone = context.object.pose.bones["meum.leg.setting.L"]
+        # fk2ik
+        if meum_bone["FK/IK"] == 0:
+            if CMC_OT_Switch_IK_FK.leg_fk2ik(self, context, "L"):
+                return {"FINISHED"}
+            else:
+                self.report({"ERROR"}, "Fail to switch leg FK to IK")
+                return {"CANCELLED"}
+        # ik2fk
+        if meum_bone["FK/IK"] == 1:
+            if CMC_OT_Switch_IK_FK.leg_ik2fk(self, context, "L"):
+                return {"FINISHED"}
+            else:
+                self.report({"ERROR"}, "Fail to switch leg IK to FK")
+                return {"CANCELLED"}
