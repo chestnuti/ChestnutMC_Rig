@@ -50,7 +50,7 @@ _addon_properties = {
 
     #面板属性
     bpy.types.Node:{
-        "cmc_node_expand": bpy.props.BoolProperty(name="node Expand", default=True),
+        "cmc_node_expand": bpy.props.BoolProperty(name="node Expand", default=False),
     },
     bpy.types.PoseBone:{
         "cmc_bone_expand": bpy.props.BoolProperty(name="bone Expand", default=True),

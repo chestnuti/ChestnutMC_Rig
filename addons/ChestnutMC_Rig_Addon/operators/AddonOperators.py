@@ -921,6 +921,7 @@ class CMC_OT_Switch_IK_FK(bpy.types.Operator):
                 bone["IK极向独立控制"] = 0
             if bone.name == pole_bone_name:
                 # 极向变换归零
+                bone.rotation_quaternion = (1, 0, 0, 0)
                 bone.rotation_euler = (0, 0, 0)
                 bone.location = (0, 0, 0)
                 bone.scale = (1, 1, 1)
@@ -952,19 +953,20 @@ class CMC_OT_Switch_IK_FK(bpy.types.Operator):
         aim_bone_name = "FK2IK.leg." + side
         meum_bone_name = "meum.leg.setting." + side
         pole_bone_name = "IK_Pole.leg." + side
+        aim_pole_bone_name = "FK2IK_Pole.leg." + side
+        control_ankle_name = "control.ankle." + side
 
         CMC_OT_Switch_IK_FK.copy_transform(self, context, ik_bone_name, aim_bone_name)
+        CMC_OT_Switch_IK_FK.copy_transform(self, context, pole_bone_name, aim_pole_bone_name)
 
         # 切换ikfk参数
         for bone in context.active_object.pose.bones:
             if bone.name == meum_bone_name:
                 bone["FK/IK"] = 1
-                bone["IK极向独立控制"] = 0
-            if bone.name == pole_bone_name:
-                # 极向变换归零
+                #bone["IK极向独立控制"] = 0
+            # control.ankle旋转归零
+            if bone.name == control_ankle_name:
                 bone.rotation_euler = (0, 0, 0)
-                bone.location = (0, 0, 0)
-                bone.scale = (1, 1, 1)
         return True
 
     # 腿IK转FK
@@ -974,8 +976,8 @@ class CMC_OT_Switch_IK_FK(bpy.types.Operator):
         bones_name = ["control.upper_leg." + side, "control.lower_leg." + side]
         aim_bones_name = ["IK2FK.upper_leg." + side, "IK2FK.lower_leg." + side]
         meum_bone_name = "meum.leg.setting." + side
-        ik_bone_name = "IK.leg." + side
         feet_bone_name = "control.feet." + side
+        ik_bone_name = "IK.leg." + side
 
         for i, bone_name in enumerate(bones_name):
             CMC_OT_Switch_IK_FK.copy_transform(self, context, bone_name, aim_bones_name[i])
@@ -988,6 +990,12 @@ class CMC_OT_Switch_IK_FK(bpy.types.Operator):
             if bone.name == meum_bone_name:
                 bone["FK/IK"] = 0
                 context.active_bone.hide = False
+            # ik控制骨复位
+            if bone.name == ik_bone_name:
+                bone.rotation_quaternion = (1, 0, 0, 0)
+                bone.rotation_euler = (0, 0, 0)
+                bone.location = (0, 0, 0)
+                bone.scale = (1, 1, 1)
         return True
 
 

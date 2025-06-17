@@ -42,7 +42,7 @@ def get_rig_parameters(box, context: bpy.types.Context, bone_name: str):
     row.prop(bone, "cmc_bone_expand",
                 icon="TRIA_DOWN" if bone.cmc_bone_expand else "TRIA_RIGHT",
                 text="",
-                emboss=False)
+                emboss=True)
     row.label(text=Rig_Parameters_bones[bone_name], icon="POSE_HLT")
     # 面板展开与收起
     if bone.cmc_bone_expand is False:
@@ -130,7 +130,7 @@ def get_face_parameters(box, context: bpy.types.Context, material_name: str):
             row.prop(node, "cmc_node_expand",
                 icon="TRIA_DOWN" if node.cmc_node_expand else "TRIA_RIGHT",
                 text="",
-                emboss=False)
+                emboss=True)
             row.label(text=node.name)
             if node.cmc_node_expand is False:
                 continue

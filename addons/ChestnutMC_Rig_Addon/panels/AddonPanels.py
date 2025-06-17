@@ -132,14 +132,14 @@ class RigPropertiesPanel(BasePanel, bpy.types.Panel):
             box  = layout.box()
             row = box.row()
             Lbox = row.box()
-            get_rig_parameters(Lbox, context, "meum.arm.setting.L")
+            get_rig_parameters(Lbox, context, "meum.arm.setting.R")
             Rbox  = row.box()
-            get_rig_parameters(Rbox, context, "meum.arm.setting.R")
+            get_rig_parameters(Rbox, context, "meum.arm.setting.L")
             row = box.row()
             Lbox = row.box()
-            get_rig_parameters(Lbox, context, "meum.leg.setting.L")
+            get_rig_parameters(Lbox, context, "meum.leg.setting.R")
             Rbox  = row.box()
-            get_rig_parameters(Rbox, context, "meum.leg.setting.R")
+            get_rig_parameters(Rbox, context, "meum.leg.setting.L")
 
             # 材质参数绘制面板
             box = layout.box()
