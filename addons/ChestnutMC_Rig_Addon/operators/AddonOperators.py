@@ -881,6 +881,22 @@ class CHESTNUTMC_OT_SaveFace2Skin(bpy.types.Operator):
 #*****************************************************
 #******************** 骨骼相关操作 ********************
 #*****************************************************
+
+# 复制骨骼变换
+def copy_transform(self, context: bpy.types.Context, bone_name: str, aim_bone_name: str):
+    armature = context.active_object
+    # 复制变换
+    bone = context.active_object.pose.bones[bone_name]
+    aim_bone = context.active_object.pose.bones[aim_bone_name]
+    # 为骨骼添加复制变换约束
+    constraint = bone.constraints.new("COPY_TRANSFORMS")
+    constraint.target = context.active_object
+    constraint.subtarget = aim_bone_name
+    # 应用约束
+    armature.data.bones.active = bone.bone
+    bpy.ops.constraint.apply(constraint=constraint.name, owner='BONE')
+
+
 # ik/fk无缝切换
 class CMC_OT_Switch_IK_FK(bpy.types.Operator):
     """Switch IK/FK"""
@@ -889,19 +905,6 @@ class CMC_OT_Switch_IK_FK(bpy.types.Operator):
     bl_description = "Switch IK/FK"
     bl_options = {'REGISTER', 'UNDO'}
 
-    # 复制骨骼变换
-    def copy_transform(self, context: bpy.types.Context, bone_name: str, aim_bone_name: str):
-        armature = context.active_object
-        # 复制变换
-        bone = context.active_object.pose.bones[bone_name]
-        aim_bone = context.active_object.pose.bones[aim_bone_name]
-        # 为骨骼添加复制变换约束
-        constraint = bone.constraints.new("COPY_TRANSFORMS")
-        constraint.target = context.active_object
-        constraint.subtarget = aim_bone_name
-        # 应用约束
-        armature.data.bones.active = bone.bone
-        bpy.ops.constraint.apply(constraint=constraint.name, owner='BONE')
 
     # 手臂FK转IK
     def arm_fk2ik(self, context: bpy.types.Context, side: str):
@@ -912,7 +915,7 @@ class CMC_OT_Switch_IK_FK(bpy.types.Operator):
         meum_bone_name = "meum.arm.setting." + side
         pole_bone_name = "IK_Pole.arm." + side
 
-        CMC_OT_Switch_IK_FK.copy_transform(self, context, ik_bone_name, aim_bone_name)
+        copy_transform(self, context, ik_bone_name, aim_bone_name)
 
         # 切换ikfk参数
         for bone in context.active_object.pose.bones:
@@ -936,7 +939,7 @@ class CMC_OT_Switch_IK_FK(bpy.types.Operator):
         meum_bone_name = "meum.arm.setting." + side
 
         for i, bone_name in enumerate(bones_name):
-            CMC_OT_Switch_IK_FK.copy_transform(self, context, bone_name, aim_bones_name[i])
+            copy_transform(self, context, bone_name, aim_bones_name[i])
 
         # 切换ikfk参数
         for bone in context.active_object.pose.bones:
@@ -956,8 +959,8 @@ class CMC_OT_Switch_IK_FK(bpy.types.Operator):
         aim_pole_bone_name = "FK2IK_Pole.leg." + side
         control_ankle_name = "control.ankle." + side
 
-        CMC_OT_Switch_IK_FK.copy_transform(self, context, ik_bone_name, aim_bone_name)
-        CMC_OT_Switch_IK_FK.copy_transform(self, context, pole_bone_name, aim_pole_bone_name)
+        copy_transform(self, context, ik_bone_name, aim_bone_name)
+        copy_transform(self, context, pole_bone_name, aim_pole_bone_name)
 
         # 切换ikfk参数
         for bone in context.active_object.pose.bones:
@@ -980,10 +983,10 @@ class CMC_OT_Switch_IK_FK(bpy.types.Operator):
         ik_bone_name = "IK.leg." + side
 
         for i, bone_name in enumerate(bones_name):
-            CMC_OT_Switch_IK_FK.copy_transform(self, context, bone_name, aim_bones_name[i])
+            copy_transform(self, context, bone_name, aim_bones_name[i])
 
         # 复制ik控制骨变换至脚踝
-        CMC_OT_Switch_IK_FK.copy_transform(self, context, feet_bone_name, ik_bone_name)
+        copy_transform(self, context, feet_bone_name, ik_bone_name)
 
         # 切换ikfk参数
         for bone in context.active_object.pose.bones:
