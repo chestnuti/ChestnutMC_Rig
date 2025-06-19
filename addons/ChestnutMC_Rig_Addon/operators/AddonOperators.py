@@ -3,6 +3,7 @@ import os.path
 import glob
 import json
 import struct
+import shutil
 
 from ..config import __addon_name__
 from ..panels.ImageManager import *
@@ -47,7 +48,7 @@ def search_skin_preset(json, skin_name):
             return skin_preset
     return None
 
-def check_cmc_rig(selected_object):
+def check_cmc_rig(selected_object: bpy.types.Object):
     # 如果当前活动物体是Mesh
     if selected_object.type == 'MESH':
         # 验证名称前缀是否为"preview"
@@ -74,11 +75,25 @@ def check_cmc_rig(selected_object):
 
     return False
 
+def get_cmc_rig(selected_object: bpy.types.Object):
+    if check_cmc_rig(selected_object):
+        if selected_object.type == 'ARMATURE':
+            for child in selected_object.children:
+                if child.type == 'MESH' and child.name.startswith("preview"):
+                    return selected_object
+        elif selected_object.type == 'MESH':
+            if selected_object.parent.type == 'ARMATURE':
+                for chile in selected_object.parent.children:
+                    if chile.type == 'MESH' and chile.name.startswith("preview"):
+                        return selected_object.parent
+    return None
+
 
 
 #*****************************************************
-#******************* 加载资产库操作 *******************
+#******************* 资产库操作 ***********************
 #*****************************************************
+# 加载资产库
 class CHESTNUTMC_OT_LoadLibraryOperator(bpy.types.Operator):
     '''Load Library Assets'''
     bl_idname = "cmc.load_library"
@@ -143,6 +158,52 @@ class CHESTNUTMC_OT_LoadLibraryOperator(bpy.types.Operator):
         Load_skin_previews()
 
         return {'FINISHED'}
+
+
+
+# 导出资产库
+class CHESTNUTMC_OT_Export_Asset_Library(bpy.types.Operator):
+    bl_idname = "cmc.export_asset_library"
+    bl_label = "Export Asset Library"
+    bl_description = "Export Asset Library"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    filepath: bpy.props.StringProperty(subtype="DIR_PATH") # type: ignore
+
+    def invoke(self, context, event):
+        # 选择路径
+        context.window_manager.fileselect_add(self)
+        return {'RUNNING_MODAL'}
+
+    def execute(self, context):
+
+        ex_path = os.path.join(self.filepath, "ChestnutMC_AssetLibrary")
+        assets_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../assets"))
+        config_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../config"))
+
+        # 复制文件到目标目录
+        try:
+            os.makedirs(ex_path, exist_ok=True)
+            shutil.copytree(assets_path, os.path.join(ex_path, "assets"))
+            shutil.copytree(config_path, os.path.join(ex_path, "config"))
+        except Exception as e:
+            self.report({"ERROR"}, f"Export Failed: {e}")
+            return {"CANCELLED"}
+
+        self.report({"INFO"}, f"Export Success to {ex_path}")
+        return {"FINISHED"}
+
+
+# TODO 合并资产库
+class CHESTNUTMC_OT_Merge_Assets(bpy.types.Operator):
+    """Merge Assets"""
+    bl_idname = "chestnutmc.merge_assets"
+    bl_label = "Merge Assets"
+    bl_options = {"REGISTER", "UNDO"}
+
+    def execute(self, context: bpy.types.Context):
+
+        return {"FINISHED"}
 
 
 
@@ -255,6 +316,7 @@ class CHESTNUTMC_OT_RigImportOperator(bpy.types.Operator):
 
 # 变更预览图
 class CHESTNUTMC_OT_UpdateRigPreview(bpy.types.Operator):
+    '''Update Rig Preview'''
     bl_idname = "cmc.update_rig_preview"
     bl_label = "Update Preview"
     bl_description = "Update the rig preview image"
@@ -310,6 +372,7 @@ class CHESTNUTMC_OT_UpdateRigPreview(bpy.types.Operator):
 
 # 保存人模
 class CHESTNUTMC_OT_RigSave(bpy.types.Operator):
+    '''Save Rig'''
     bl_idname = "cmc.rig_save"
     bl_label = "Save Rig"
     bl_description = "Save the rig to the selected path"
@@ -387,23 +450,29 @@ class CHESTNUTMC_OT_RigSave(bpy.types.Operator):
         return False
 
     def execute(self, context):
-        selected_rig = context.active_object
+        selected_obj = context.active_object
 
-        if self.rigname == "":
-            self.rigname = selected_rig.name
-        # 规范命名
-        self.rigname = self.rigname.replace(".", "_")
-        filename = self.rigname.replace(" ", "_")
-        filename = filename + ".blend"
+        if check_cmc_rig(selected_obj):
+            # 获取骨骼
+            selected_rig = get_cmc_rig(selected_obj)
+            if selected_rig is None:
+                self.report({"ERROR"}, "Connot find ChestnutMC rig!")
+                return {"CANCELLED"}
 
-        # 检查json中重名项
-        rig_json = read_rig_json(self)
-        for key, value in rig_json.items():
-            if value['name'] == self.rigname:
-                self.report({'ERROR'}, "Rig name have already exists. Please choose another name.")
-                return {'CANCELLED'}
+            if self.rigname == "":
+                self.rigname = selected_rig.name
+            # 规范命名
+            self.rigname = self.rigname.replace(".", "_")
+            filename = self.rigname.replace(" ", "_")
+            filename = filename + ".blend"
 
-        if check_cmc_rig(selected_rig):
+            # 检查json中重名项
+            rig_json = read_rig_json(self)
+            for key, value in rig_json.items():
+                if value['name'] == self.rigname:
+                    self.report({'ERROR'}, "Rig name have already exists. Please choose another name.")
+                    return {'CANCELLED'}
+
             # 获取选中物体所属集合
             select_collection = selected_rig.users_collection[0].name
             # 保存到新blend文件并获取集合名字
@@ -432,6 +501,7 @@ class CHESTNUTMC_OT_RigSave(bpy.types.Operator):
 
 # 删除人模
 class CHESTNUTMC_OT_RigDelete(bpy.types.Operator):
+    '''Delete Rig'''
     bl_idname = "cmc.rig_delete"
     bl_label = "Delete Rig"
     bl_description = "Delete the selected rig"
@@ -483,6 +553,7 @@ class CHESTNUTMC_OT_RigDelete(bpy.types.Operator):
 
 # 重命名人模
 class CMC_OT_RigRename(bpy.types.Operator):
+    '''Rename the rig'''
     bl_idname = "cmc.rig_rename"
     bl_label = "Rename Rig"
     bl_description = "Rename the rig"
@@ -538,6 +609,7 @@ class CMC_OT_RigRename(bpy.types.Operator):
 #*****************************************************
 # 添加皮肤
 class CHESTNUTMC_OT_SkinAdd(bpy.types.Operator):
+    '''Add Skin'''
     bl_idname = "cmc.skin_add"
     bl_label = "Add Skin"
     bl_options = {'REGISTER', 'UNDO'}
@@ -587,6 +659,7 @@ class CHESTNUTMC_OT_SkinAdd(bpy.types.Operator):
 
 # 删除皮肤
 class CHESTNUTMC_OT_SkinRemove(bpy.types.Operator):
+    '''Delete skin'''
     bl_idname = "cmc.skin_remove"
     bl_label = "Remove Skin"
     bl_options = {'REGISTER', 'UNDO'}
@@ -624,6 +697,7 @@ class CHESTNUTMC_OT_SkinRemove(bpy.types.Operator):
 
 # 重命名皮肤
 class CHESTNUTMC_OT_SkinRename(bpy.types.Operator):
+    '''Rename skin'''
     bl_idname = "cmc.skin_rename"
     bl_label = "Rename Skin"
     bl_description = "Rename skin"
@@ -688,6 +762,7 @@ class CHESTNUTMC_OT_SkinRename(bpy.types.Operator):
 
 # 应用皮肤
 class CHESTNUTMC_OT_SkinApply(bpy.types.Operator):
+    '''Apply skin to the rig'''
     bl_idname = "cmc.skin_apply"
     bl_label = "Apply Skin"
     bl_description = "Apply skin"
@@ -948,6 +1023,7 @@ class CHESTNUTMC_OT_SkinApply(bpy.types.Operator):
 
 # 储存皮肤脸部预设
 class CHESTNUTMC_OT_SaveFace2Skin(bpy.types.Operator):
+    '''Save the face preset to skin'''
     bl_idname = "cmc.save_face2skin"
     bl_label = "Save Face to Skin"
     bl_description = "Save the current face to skin"

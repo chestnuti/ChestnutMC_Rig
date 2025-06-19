@@ -77,12 +77,14 @@ class CMC_ImportPreferences(AddonPreferences):
         default='APPEND',
     ) # type: ignore
 
-    '''def draw(self, context: bpy.types.Context):
-        layout = self.layout
-        layout.label(text="Add-on Preferences View")
-        layout.prop(self, "rig_path")
-        layout.prop(self, "version")
-        layout.prop(self, "using_mode")'''
-
     #******************** 预设属性 ********************
     rig_presets: {} # type: ignore
+
+
+    #******************** 绘制面板 ********************
+    def draw(self, context: bpy.types.Context):
+        layout = self.layout
+        layout.label(text="Add-on Preferences")
+        row = layout.row()
+        row.label(text="Presets Panel")
+        row.operator("cmc.export_asset_library", text="Export Asset Library", icon="EXPORT")
