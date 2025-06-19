@@ -33,7 +33,7 @@ class ImportPanel(BasePanel, bpy.types.Panel):
         row = layout.row()
         if CHESTNUTMC_OT_RigImportOperator.poll(context):
             row.label(text="Libraries loaded")
-            row.operator(CHESTNUTMC_OT_LoadLibraryOperator.bl_idname, text="Reload Libraries")
+            row.operator(CHESTNUTMC_OT_LoadLibraryOperator.bl_idname, text="Reload Libraries", icon="FILE_REFRESH")
         else:
             row.label(icon="INFO", text="Please load libraries first")
             row.operator(CHESTNUTMC_OT_LoadLibraryOperator.bl_idname, text="Load Libraries")
@@ -46,12 +46,18 @@ class ImportPanel(BasePanel, bpy.types.Panel):
         # 预览面板
         row = layout.row()
         row.template_icon_view(scene, "cmc_rig_previews")
-
-        '''row = layout.row()
-        row.prop(scene, "my_previews")'''
+        row = layout.row()
+        row.prop(scene, "cmc_rig_previews", text='Select Rig')
 
         # 操作按钮行
         layout.operator(CHESTNUTMC_OT_RigImportOperator.bl_idname, icon="IMPORT")
+        row = layout.row()
+        colum = row.column()
+        colum.operator(CHESTNUTMC_OT_RigSave.bl_idname, icon="FILE_NEW")
+        colum.operator(CHESTNUTMC_OT_RigDelete.bl_idname, icon="TRASH")
+        colum = row.column()
+        colum.operator(CHESTNUTMC_OT_UpdateRigPreview.bl_idname, icon="FILE_REFRESH")
+        colum.operator(CMC_OT_RigRename.bl_idname, icon="FILE_TICK")
         layout.separator()
 
     @classmethod

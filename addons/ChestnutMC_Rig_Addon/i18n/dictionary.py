@@ -25,7 +25,7 @@ dictionary = {
         ("Operator", "Seamless FK->IK"): "无缝FK->IK",
         ("Operator", "Seamless IK->FK"): "无缝IK->FK",
         ("Operator", "Apply Skin"): "应用皮肤",
-        ("Operator", "Save Arm and Face to Skin"): "保存脸到皮肤",
+        ("Operator", "Save Arm and Face to Skin"): "保存皮肤手臂和脸部设置",
         ("*", "General Setting"):  "常规设置",
         ("*", "Face Setting"):  "脸部设置",
         ("*", "Right Arm Setting"):  "右手设置",

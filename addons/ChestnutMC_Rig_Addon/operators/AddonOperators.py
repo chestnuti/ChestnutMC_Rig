@@ -25,26 +25,7 @@ def read_skin_json(self):
         self.report({'ERROR'}, "Fail to load skin json: {}".format(str(e)))
         return None
 
-def search_skin_preset(json, skin_name):
-    '''搜索皮肤预设，并返回皮肤预设字典'''
-    if json is None:
-        return None
-    for list, skin_preset in json.items():
-        if skin_preset['skin_name'] == skin_name:
-            return skin_preset
-    return None
-
-
-
-#*****************************************************
-#******************* 加载资产库操作 *******************
-#*****************************************************
-class CHESTNUTMC_OT_LoadLibraryOperator(bpy.types.Operator):
-    '''Load Library Assets'''
-    bl_idname = "cmc.load_library"
-    bl_label = "Load Library"
-
-    def read_rig_json(self):
+def read_rig_json(self):
         addon_prefs = bpy.context.preferences.addons[__addon_name__].preferences
 
         # 验证资产库路径
@@ -56,6 +37,52 @@ class CHESTNUTMC_OT_LoadLibraryOperator(bpy.types.Operator):
         except Exception as e:
             self.report({'ERROR'}, "Fail to load rig json: {}".format(str(e)))
             return None
+
+def search_skin_preset(json, skin_name):
+    '''搜索皮肤预设，并返回皮肤预设字典'''
+    if json is None:
+        return None
+    for list, skin_preset in json.items():
+        if skin_preset['skin_name'] == skin_name:
+            return skin_preset
+    return None
+
+def check_cmc_rig(selected_object):
+    # 如果当前活动物体是Mesh
+    if selected_object.type == 'MESH':
+        # 验证名称前缀是否为"preview"
+        if selected_object.name.startswith("preview"):
+            return True
+        else:
+            # 获取父级骨骼
+            parent_armature = None
+            if selected_object.parent is not None:
+                parent_armature = selected_object.parent
+                if parent_armature and parent_armature.type == 'ARMATURE':
+                    # 获取父级骨骼中名为"preview"的子物体
+                    for child in parent_armature.children:
+                        if child.type == 'MESH' and child.name.startswith("preview"):
+                            return True
+            else:
+                return False
+    # 如果当前活动物体是Armature
+    elif selected_object.type == 'ARMATURE':
+        # 选择子集中前缀为preview的mesh
+        for child in selected_object.children:
+            if child.type == 'MESH' and child.name.startswith("preview"):
+                return True
+
+    return False
+
+
+
+#*****************************************************
+#******************* 加载资产库操作 *******************
+#*****************************************************
+class CHESTNUTMC_OT_LoadLibraryOperator(bpy.types.Operator):
+    '''Load Library Assets'''
+    bl_idname = "cmc.load_library"
+    bl_label = "Load Library"
 
     # 加载资产库
     def execute(self, context: bpy.types.Context):
@@ -75,26 +102,21 @@ class CHESTNUTMC_OT_LoadLibraryOperator(bpy.types.Operator):
         scene.cmc_skin_list.clear()
 
         # 读取人模资产库JSON文件
-        rig_library = self.read_rig_json()
+        rig_library = read_rig_json(self)
         # 遍历所有Blend文件
         for rig_file in glob.glob(os.path.join(addon_prefs.rig_path, "*.blend")):
             # 获取文件名
             file_name = os.path.basename(rig_file)
-            # 写入列表
-            item = scene.cmc_rig_list.add()
-            item.name = file_name
-            item.path = rig_file
-            # 载入预览图路径
-            if item.name in rig_library:
-                item.preview = os.path.join(
-                    addon_prefs.rig_preview_path,
-                    rig_library[item.name]["preview"]
-                )
-            else:
-                item.preview = ""
+            if file_name in rig_library:
+                # 写入列表
+                item = scene.cmc_rig_list.add()
+                item.name = rig_library[file_name]["name"]
+                item.path = rig_file
+                # 载入预览图路径和预设集合名称
+                preview_path = os.path.join(addon_prefs.rig_preview_path, rig_library[file_name]["preview"])
+                item.preview = preview_path if os.path.exists(preview_path) else os.path.join(addon_prefs.rig_preview_path, "NO_PREVIEW.png")
+                item.collection = rig_library[file_name]["collection"]
             #print(item.preview)
-            # 载入预设集合名称
-            item.collection = rig_library[item.name]["collection"]
 
         #加载rig预览
         Load_rig_previews()
@@ -188,8 +210,7 @@ class CHESTNUTMC_OT_RigImportOperator(bpy.types.Operator):
         addon_prefs = context.preferences.addons[__addon_name__].preferences
 
         selected_rig = context.scene.cmc_rig_previews
-        selected_rig_path = os.path.join(addon_prefs.rig_path, selected_rig)
-        print(selected_rig_path)
+        selected_rig_path = context.scene.cmc_rig_list[selected_rig].path
 
         # 验证选中项路径是否存在
         if not os.path.exists(selected_rig_path):
@@ -235,24 +256,281 @@ class CHESTNUTMC_OT_RigImportOperator(bpy.types.Operator):
 # 变更预览图
 class CHESTNUTMC_OT_UpdateRigPreview(bpy.types.Operator):
     bl_idname = "cmc.update_rig_preview"
-    bl_label = "Update Rig Preview"
+    bl_label = "Update Preview"
     bl_description = "Update the rig preview image"
     bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
     def poll(cls, context: bpy.types.Context):
-        return context.scene.cmc_rig_list_index >= 0
+        return context.scene.cmc_rig_previews
 
     def execute(self, context: bpy.types.Context):
-        scene = context.scene
         addon_prefs = context.preferences.addons[__addon_name__].preferences
 
-        # 获取当前选中的人模
-        selected_rig = scene.cmc_rig_list[scene.cmc_rig_list_index]
+        # 获取选中人模
+        selected_rig = context.scene.cmc_rig_previews
+        preview_name = context.scene.cmc_rig_list[selected_rig].preview
 
+        output_path = os.path.join(addon_prefs.rig_preview_path, preview_name)
 
+        # 保存原渲染路径和格式
+        original_render_path = context.scene.render.filepath
+        original_render_file_format = context.scene.render.image_settings.file_format
+        original_render_resolution_x = context.scene.render.resolution_x
+        original_render_resolution_y = context.scene.render.resolution_y
+        original_show_overlays = context.space_data.overlay.show_overlays
+        original_lens = context.space_data.lens
+        # 设置渲染路径和格式
+        context.scene.render.image_settings.file_format = 'PNG'
+        context.scene.render.filepath = output_path
+        context.scene.render.resolution_x = 1080
+        context.scene.render.resolution_y = 1080
+        context.space_data.overlay.show_overlays = False
+        bpy.ops.view3d.view_selected()
+        context.space_data.lens = 100
+
+        # 视图渲染
+        bpy.ops.render.opengl(write_still=True)
+
+        # 路径还原和格式
+        context.scene.render.filepath = original_render_path
+        context.scene.render.image_settings.file_format = original_render_file_format
+        context.scene.render.resolution_x = original_render_resolution_x
+        context.scene.render.resolution_y = original_render_resolution_y
+        context.space_data.overlay.show_overlays = original_show_overlays
+        context.space_data.lens = original_lens
+
+        #加载rig预览
+        Load_rig_previews()
+
+        self.report({'INFO'}, "Rig Preview updated.")
 
         return {'FINISHED'}
+
+
+# 保存人模
+class CHESTNUTMC_OT_RigSave(bpy.types.Operator):
+    bl_idname = "cmc.rig_save"
+    bl_label = "Save Rig"
+    bl_description = "Save the rig to the selected path"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    rigname: bpy.props.StringProperty(name="Rig name") # type: ignore
+
+    def save_to_blend(self, context: bpy.types.Context, select_collection: str, filename: str):
+        addon_prefs = context.preferences.addons[__addon_name__].preferences
+
+        # 设置导出路径
+        export_path = os.path.join(addon_prefs.rig_path, filename)
+        os.makedirs(os.path.dirname(export_path), exist_ok=True)
+
+        # 检查重名项
+        if os.path.exists(export_path):
+            return False
+
+        # 要导出的集合名称
+        source_coll = bpy.data.collections.get(select_collection)
+        if not source_coll:
+            print(f"Connot find collection: {select_collection}")
+            raise SystemExit
+
+        # 创建导出用场景
+        original_scene = bpy.context.scene
+        export_scene = bpy.data.scenes.new("CMC_ExportScene")
+        bpy.context.window.scene = export_scene
+
+        # 复制源集合到导出场景
+        new_coll = source_coll.copy()
+        new_coll.name = self.rigname + "_Rig"
+        new_coll.name = new_coll.name.replace(".", "_")
+        export_scene.collection.children.link(new_coll)
+
+        # 准备写入的数据
+        data_blocks = {export_scene}
+
+        # 写入 .blend 文件
+        bpy.data.libraries.write(export_path, data_blocks)
+        print(f"Collection '{source_coll.name}' have already exported to: {export_path}")
+
+        # 清理
+        bpy.context.window.scene = original_scene
+        bpy.data.scenes.remove(export_scene)
+
+        return new_coll.name
+
+    # 保存预设到json文件
+    def save_rig_json(self, context: bpy.types.Context, new_coll_name: str, filename: str):
+        addon_prefs = context.preferences.addons[__addon_name__].preferences
+
+        new_preset = {
+            "name": self.rigname,
+            "path": filename,
+            "preview": filename.replace(".blend", ".png"),
+            "collection": new_coll_name,
+        }
+
+        # 打开人模json文件
+        rig_json = read_rig_json(self)
+        rig_json[filename] = new_preset
+        # 保存
+        with open(addon_prefs.rig_preset_json, 'w', encoding='utf-8') as f:
+            json.dump(rig_json, f, indent=4, ensure_ascii=False)
+
+
+    def invoke(self, context, event):
+        return bpy.context.window_manager.invoke_props_dialog(self)
+
+    @classmethod
+    def poll(cls, context: bpy.types.Context):
+        if context.active_object is not None:
+            return check_cmc_rig(context.active_object)
+        return False
+
+    def execute(self, context):
+        selected_rig = context.active_object
+
+        if self.rigname == "":
+            self.rigname = selected_rig.name
+        # 规范命名
+        self.rigname = self.rigname.replace(".", "_")
+        filename = self.rigname.replace(" ", "_")
+        filename = filename + ".blend"
+
+        # 检查json中重名项
+        rig_json = read_rig_json(self)
+        for key, value in rig_json.items():
+            if value['name'] == self.rigname:
+                self.report({'ERROR'}, "Rig name have already exists. Please choose another name.")
+                return {'CANCELLED'}
+
+        if check_cmc_rig(selected_rig):
+            # 获取选中物体所属集合
+            select_collection = selected_rig.users_collection[0].name
+            # 保存到新blend文件并获取集合名字
+            new_coll_name = self.save_to_blend(context, select_collection, filename)
+            if new_coll_name:
+                # 写入json文件
+                self.save_rig_json(context, new_coll_name, filename)
+            else:
+                self.report({'ERROR'}, "Rig name have already exists. Please choose another name.")
+                return {'CANCELLED'}
+
+            # 重载资产库
+            bpy.ops.cmc.load_library()
+
+            # 选中新增人模
+            context.scene.cmc_rig_previews = '%s' % self.rigname
+            # 更新预览图
+            bpy.ops.cmc.update_rig_preview()
+
+            self.report({'INFO'}, f"Rig {self.rigname} saved successfully")
+            return {'FINISHED'}
+
+        self.report({'ERROR'}, "Invalid rig selected")
+        return {'CANCELLED'}
+
+
+# 删除人模
+class CHESTNUTMC_OT_RigDelete(bpy.types.Operator):
+    bl_idname = "cmc.rig_delete"
+    bl_label = "Delete Rig"
+    bl_description = "Delete the selected rig"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context: bpy.types.Context):
+        return context.scene.cmc_rig_previews
+
+    def invoke(self, context, event):
+        scene = context.scene
+
+        return context.window_manager.invoke_props_dialog(self, title="Are you sure you want to delete rig: {}?".format(scene.cmc_rig_previews))
+
+    def execute(self, context):
+        addon_prefers = bpy.context.preferences.addons[__addon_name__].preferences
+
+        selected_rig_name = context.scene.cmc_rig_previews
+        try:
+            selected_rig = context.scene.cmc_rig_list[selected_rig_name]
+        except Exception as e:
+            self.report({'ERROR'}, str(e))
+            return {'CANCELLED'}
+
+        # 删除选中人模.blend文件
+        if os.path.exists(selected_rig.path):
+            os.remove(selected_rig.path)
+
+        # 删除预览图
+        if os.path.exists(selected_rig.preview):
+            os.remove(selected_rig.preview)
+
+        # 删除json配置
+        rig_json = read_rig_json(self)
+        for key, value in rig_json.items():
+            if value['name'] == selected_rig.name:
+                del rig_json[key]
+                break
+
+        # 保存
+        with open(addon_prefers.rig_preset_json, 'w', encoding='utf-8') as f:
+            json.dump(rig_json, f, indent=4, ensure_ascii=False)
+
+        # 重新加载资产库
+        bpy.ops.cmc.load_library()
+
+        return {'FINISHED'}
+
+
+# 重命名人模
+class CMC_OT_RigRename(bpy.types.Operator):
+    bl_idname = "cmc.rig_rename"
+    bl_label = "Rename Rig"
+    bl_description = "Rename the rig"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    new_name: StringProperty(name="New Name") # type: ignore
+
+    @classmethod
+    def poll(cls, context):
+        return context.scene.cmc_rig_previews
+
+    def invoke(self, context, event):
+        return bpy.context.window_manager.invoke_props_dialog(self)
+
+    def execute(self, context):
+        addon_prefers = bpy.context.preferences.addons[__addon_name__].preferences
+
+        selected_rig_name = context.scene.cmc_rig_previews
+        try:
+            selected_rig = context.scene.cmc_rig_list[selected_rig_name]
+        except Exception as e:
+            self.report({'ERROR'}, str(e))
+            return {'CANCELLED'}
+
+        rig_json = read_rig_json(self)
+
+        # 检查重名项
+        for key, value in rig_json.items():
+            if value['name'] == self.new_name:
+                self.report({'ERROR'}, "Rig name already exists!")
+                return {'CANCELLED'}
+
+        # 重命名json配置
+        for key, value in rig_json.items():
+            if value['name'] == selected_rig.name:
+                rig_json[key]['name'] = self.new_name
+                break
+        # 保存
+        with open(addon_prefers.rig_preset_json, 'w', encoding='utf-8') as f:
+            json.dump(rig_json, f, indent=4, ensure_ascii=False)
+
+        # 重新加载资产库
+        bpy.ops.cmc.load_library()
+
+        return {'FINISHED'}
+
+
+
 
 
 #*****************************************************
@@ -369,6 +647,10 @@ class CHESTNUTMC_OT_SkinRename(bpy.types.Operator):
         self.new_name = self.new_name + file_extension
         # 组装新路径
         new_path = os.path.join(os.path.dirname(scene.cmc_skin_list[index].path), self.new_name)
+        # 验证重名项
+        if os.path.exists(new_path):
+            self.report({'ERROR'}, "Skin already exists: {}".format(self.new_name))
+            return {'CANCELLED'}
 
         # 验证是否有脸部预设
         if scene.cmc_skin_list[index].have_preset:
@@ -804,7 +1086,7 @@ class CHESTNUTMC_OT_SaveFace2Skin(bpy.types.Operator):
     def poll(cls, context: bpy.types.Context):
         # 确保当前活动物体是Armature或Mesh
         if context.active_object is not None:
-            return context.active_object.type == 'ARMATURE' or context.active_object.type == 'MESH'
+            return check_cmc_rig(context.active_object)
         return False
 
     def invoke(self, context: bpy.types.Context, event):

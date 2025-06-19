@@ -31,14 +31,9 @@ def Load_rig_previews():
     rig_previews.clear()
 
     # 创建Rig的预览图
-    rig_previews_path = []
     for rig in scene.cmc_rig_list:
-        # 验证rig是否有预览图
-        if rig.preview == "":
-            rig.preview = os.path.join(addon_prefs.rig_preview_path, "NO_PREVIEW.png")
-        else:
-            # 加载预览图
-            rig_previews.load(rig.name, rig.preview, 'IMAGE')
+        # 加载预览图
+        rig_previews.load(rig.name, rig.preview, 'IMAGE')
 
 # rig预览图的EnumProperty回调函数
 def enum_previews_from_rig_previews(self, context):
@@ -54,14 +49,17 @@ def enum_previews_from_rig_previews(self, context):
         Load_rig_previews()
     pcoll = rig_previews
 
-    image_path = []
-    for path in scene.cmc_rig_list:
-        if path.path:
-            image_path.append(path.path)
+    files_path = []
+    names = []
+    for item in scene.cmc_rig_list:
+        if item.path:
+            files_path.append(item.path)
+            names.append(item.name)
 
-    for i, filepath in enumerate(image_path):
+    for i, filepath in enumerate(files_path):
         # generates a thumbnail preview for a file.
-        name = os.path.basename(filepath)
+        file = os.path.basename(filepath)
+        name = names[i]
         icon = pcoll.get(name)
         if not icon:
             thumb = pcoll.load(name, filepath, 'IMAGE')
