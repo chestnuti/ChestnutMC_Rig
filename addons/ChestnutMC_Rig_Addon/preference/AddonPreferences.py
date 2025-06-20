@@ -21,7 +21,7 @@ class CMC_ImportPreferences(AddonPreferences):
         name="Rig Folder",
         default=os.path.abspath(os.path.join(
             os.path.dirname(__file__),
-            "../assets/Rig"
+            "../assets/Rigs"
         )),
         subtype='DIR_PATH',
     ) # type: ignore
@@ -37,7 +37,7 @@ class CMC_ImportPreferences(AddonPreferences):
         name="Rig Preview Folder",
         default=os.path.abspath(os.path.join(
             os.path.dirname(__file__),
-            "../assets/Rig/Previews"
+            "../assets/Rigs/Previews"
         )),
         subtype='DIR_PATH',
     ) # type: ignore
@@ -46,7 +46,7 @@ class CMC_ImportPreferences(AddonPreferences):
         name="Skin File",
         default=os.path.abspath(os.path.join(
             os.path.dirname(__file__),
-            "../assets/Skin"
+            "../assets/Skins"
         )),
         subtype='DIR_PATH',
     ) # type: ignore
@@ -88,3 +88,4 @@ class CMC_ImportPreferences(AddonPreferences):
         row = layout.row()
         row.label(text="Presets Panel")
         row.operator("cmc.export_asset_library", text="Export Asset Library", icon="EXPORT")
+        row.operator("cmc.merge_assets", text="Import Asset Library", icon="IMPORT")

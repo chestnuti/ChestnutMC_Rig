@@ -26,6 +26,13 @@ dictionary = {
         ("Operator", "Seamless IK->FK"): "无缝IK->FK",
         ("Operator", "Apply Skin"): "应用皮肤",
         ("Operator", "Save Arm and Face to Skin"): "保存皮肤手臂和脸部设置",
+        ("Operator", "Save Rig"): "保存人模",
+        ("Operator", "Delete Rig"): "删除人模",
+        ("Operator", "Update Preview"): "更新预览",
+        ("Operator", "Rename Rig"): "重命名人模",
+        ("Operator", "Export Asset Library"): "导出资产库",
+        ("Operator", "Import Asset Library"): "导入资产库",
+        ("*", "Presets Panel"): "预设面板",
         ("*", "General Setting"):  "常规设置",
         ("*", "Face Setting"):  "脸部设置",
         ("*", "Right Arm Setting"):  "右手设置",
@@ -40,6 +47,12 @@ dictionary = {
         ("*", "ChestnutMC_Mouth"): "嘴巴材质",
         ("*", "ChestnutMC_EdgeLight"): "边缘光",
         ("*", "Custom Used"): "自定义的使用",
+        ("*", "mode"): "模式",
+        ("*", "filepath"): "文件路径",
+        ("Operator", "Merge Assets Library"): "合并资产库",
+        ("*", "Overwrite Existing items"): "覆盖已存在的项目",
+        ("*", "Skip Existing items"): "跳过已存在的项目",
+        ("*", "Rename Existing items"): "重命名已存在的项目",
     }
 }
 

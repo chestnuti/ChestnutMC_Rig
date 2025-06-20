@@ -4,6 +4,7 @@ import glob
 import json
 import struct
 import shutil
+import datetime
 
 from ..config import __addon_name__
 from ..panels.ImageManager import *
@@ -128,9 +129,11 @@ class CHESTNUTMC_OT_LoadLibraryOperator(bpy.types.Operator):
                 item.name = rig_library[file_name]["name"]
                 item.path = rig_file
                 # 载入预览图路径和预设集合名称
-                preview_path = os.path.join(addon_prefs.rig_preview_path, rig_library[file_name]["preview"])
+                preview_path = os.path.join(addon_prefs.rig_preview_path, os.path.splitext(file_name)[0] + ".png")
                 item.preview = preview_path if os.path.exists(preview_path) else os.path.join(addon_prefs.rig_preview_path, "NO_PREVIEW.png")
                 item.collection = rig_library[file_name]["collection"]
+            else:
+                self.report({'WARNING'}, "Invalid rig library: {}".format(file_name))
             #print(item.preview)
 
         #加载rig预览
@@ -141,8 +144,15 @@ class CHESTNUTMC_OT_LoadLibraryOperator(bpy.types.Operator):
         # 读取皮肤资产库JSON文件
         skin_library = read_skin_json(self)
         # 遍历所有Skin文件
-        for skin_file in glob.glob(os.path.join(addon_prefs.skin_path, "*.png" or "*.jpg" or "*.jpeg")):
-            # 获取文件名
+        skin_list = []
+        for skin_file in glob.glob(os.path.join(addon_prefs.skin_path, "*.png")):
+            skin_list.append(skin_file)
+        for skin_file in glob.glob(os.path.join(addon_prefs.skin_path, "*.jpg")):
+            skin_list.append(skin_file)
+        for skin_file in glob.glob(os.path.join(addon_prefs.skin_path, "*.jpeg")):
+            skin_list.append(skin_file)
+
+        for skin_file in skin_list:
             file_name = os.path.basename(skin_file)
             # 写入列表
             item = scene.cmc_skin_list.add()
@@ -184,8 +194,8 @@ class CHESTNUTMC_OT_Export_Asset_Library(bpy.types.Operator):
         # 复制文件到目标目录
         try:
             os.makedirs(ex_path, exist_ok=True)
-            shutil.copytree(assets_path, os.path.join(ex_path, "assets"))
-            shutil.copytree(config_path, os.path.join(ex_path, "config"))
+            shutil.copytree(assets_path, os.path.join(ex_path, "assets"), dirs_exist_ok=True)
+            shutil.copytree(config_path, os.path.join(ex_path, "config"), dirs_exist_ok=True)
         except Exception as e:
             self.report({"ERROR"}, f"Export Failed: {e}")
             return {"CANCELLED"}
@@ -194,14 +204,198 @@ class CHESTNUTMC_OT_Export_Asset_Library(bpy.types.Operator):
         return {"FINISHED"}
 
 
-# TODO 合并资产库
+# 合并资产库
 class CHESTNUTMC_OT_Merge_Assets(bpy.types.Operator):
-    """Merge Assets"""
-    bl_idname = "chestnutmc.merge_assets"
-    bl_label = "Merge Assets"
+    """Merge Assets Library"""
+    bl_idname = "cmc.merge_assets"
+    bl_label = "Merge Assets Library"
     bl_options = {"REGISTER", "UNDO"}
 
+    # 模式
+    mode: bpy.props.EnumProperty(
+        items=[
+            ("OVERWRITE", "Overwrite Existing items", "Overwrite existing items"),
+            ("SKIP", "Skip Existing items", "Skip existing items"),
+            ("RENAME", "Rename Existing items", "Rename existing items")
+        ],
+        default="RENAME"
+    ) # type: ignore
+
+    filepath: bpy.props.StringProperty(subtype="DIR_PATH") # type: ignore
+
+    def copy_tree_with_existing(self, src, dst):
+        """复制目录树，跳过或重命名已存在的文件"""
+        for root, dirs, files in os.walk(src):
+            # 创建对应目录结构
+            rel_path = os.path.relpath(root, src)
+            dest_dir = os.path.join(dst, rel_path)
+            os.makedirs(dest_dir, exist_ok=True)
+
+            # 复制文件
+            for file in files:
+                src_file = os.path.join(root, file)
+                dst_file = os.path.join(dest_dir, file)
+
+                # 仅当目标文件不存在时才复制
+                if not os.path.exists(dst_file):
+                    shutil.copy2(src_file, dst_file)
+                    print(f"copied: {src_file} -> {dst_file}")
+                else:
+                    # 跳过已存在的
+                    if self.mode == "SKIP":
+                        print(f"skiped: {dst_file}")
+                    # 重命名已存在的
+                    elif self.mode == "RENAME":
+                        suffix = 1
+                        # 重命名源文件
+                        while True:
+                            # 生成新文件名
+                            src_new_name = os.path.splitext(src_file)[0] + "_" + str(suffix) + os.path.splitext(src_file)[1]
+                            src_original_name = src_file
+                            dest_new_name = os.path.splitext(dst_file)[0] + "_" + str(suffix) + os.path.splitext(dst_file)[1]
+                            os.rename(src_file, src_new_name)
+                            if not os.path.exists(dest_new_name):
+                                shutil.copy2(src_new_name, dest_new_name)
+                                print(f"copied: {src_file} -> {dst_file}")
+                                # 还原名字
+                                os.rename(src_new_name, src_original_name)
+                                break
+                            suffix += 1
+
+    def merge_rig_json(self, src_json_path, dest_json_path):
+        try:
+            with open(src_json_path, "r", encoding="utf-8") as src_file:
+                src_json = json.load(src_file)
+
+            with open(dest_json_path, "r", encoding="utf-8") as dest_file:
+                dest_json = json.load(dest_file)
+        except Exception as e:
+            self.report({"ERROR"}, f"JSON Open Failed: {e}")
+            return {"CANCELLED"}
+
+        for src_name, src_value in src_json.items():
+            new_name = src_name
+            suffix = 1
+            if src_name in dest_json:
+                if self.mode == "OVERWRITE":
+                    dest_json[src_name] = src_value
+                elif self.mode == "SKIP":
+                    continue
+                elif self.mode == "RENAME":
+                    while True:
+                        # 新文件名
+                        new_name = os.path.splitext(src_name)[0] + "_" + str(suffix) + os.path.splitext(src_name)[1]
+                        suffix += 1
+                        if new_name not in dest_json:
+                            break
+                    dest_json[new_name] = src_value
+                    dest_json[new_name]["path"] = new_name
+                    dest_json[new_name]["preview"] = os.path.splitext(new_name)[0] + ".png"
+            else:
+                dest_json[new_name] = src_value
+            # 查找name重名项
+            suffix = 1
+            for dest_name, dest_value in dest_json.items():
+                if src_value["name"] == dest_value["name"]:
+                    if dest_name != new_name:
+                        # 获取当前系统时间
+                        timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+                        # 重命名
+                        dest_json[new_name]["name"] = dest_json[new_name]["name"] + f"_{suffix}_{timestamp}"
+                        suffix += 1
+
+        # 保存
+        with open(dest_json_path, "w", encoding="utf-8") as dest_file:
+            json.dump(dest_json, dest_file, ensure_ascii=False, indent=4)
+
+
+    def merge_skin_json(self, src_json_path, dest_json_path):
+        try:
+            with open(src_json_path, "r", encoding="utf-8") as src_file:
+                src_json = json.load(src_file)
+
+            with open(dest_json_path, "r", encoding="utf-8") as dest_file:
+                dest_json = json.load(dest_file)
+        except Exception as e:
+            self.report({"ERROR"}, f"JSON Open Failed: {e}")
+
+        # 检查重名皮肤预设，并返回序号
+        def check_skin_name(skin_name):
+            for dest_i, dest_value in dest_json.items():
+                if skin_name == dest_value["skin_name"]:
+                    return dest_i
+            return -1
+
+        for src_i, src_value in src_json.items():
+            suffix = 1
+            i = check_skin_name(src_value["skin_name"])
+            if i != -1:
+                if self.mode == "OVERWRITE":
+                    dest_json[i] = src_value
+                elif self.mode == "SKIP":
+                    continue
+                elif self.mode == "RENAME":
+                    while True:
+                        # 新名字
+                        new_name = os.path.splitext(src_value["skin_name"])[0] + f"_{suffix}" + os.path.splitext(src_value["skin_name"])[1]
+                        suffix += 1
+                        if check_skin_name(new_name) == -1:
+                            i = int(list(dest_json.keys())[-1]) + 1
+                            src_value["skin_name"] = new_name
+                            dest_json[i] = src_value
+                            break
+            else:
+                i = int(list(dest_json.keys())[-1]) + 1
+                dest_json[i] = src_value
+
+        # 保存
+        with open(dest_json_path, "w", encoding="utf-8") as dest_file:
+            json.dump(dest_json, dest_file, ensure_ascii=False, indent=4)
+
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_props_dialog(self)
+
     def execute(self, context: bpy.types.Context):
+        addon_perefers = context.preferences.addons[__addon_name__].preferences
+
+        selected_assets_path = os.path.abspath(os.path.join(self.filepath, "assets"))
+        selected_config_path = os.path.abspath(os.path.join(self.filepath, "config"))
+
+        dest_assets_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../assets"))
+        dest_config_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../config"))
+
+        # 检查路径是否存在
+        if not os.path.exists(selected_assets_path):
+            self.report({'ERROR'}, "Assets path not found: " + selected_assets_path)
+            return {'CANCELLED'}
+        if not os.path.exists(selected_config_path):
+            self.report({'ERROR'}, "Config path not found: " + selected_config_path)
+            return {'CANCELLED'}
+
+        # 覆盖重名项复制
+        if self.mode == "OVERWRITE":
+            try:
+                shutil.copytree(selected_assets_path, dest_assets_path, dirs_exist_ok=True)
+            except Exception as e:
+                self.report({"ERROR"}, f"Assets Merge Failed: {e}")
+                return {"CANCELLED"}
+        # 跳过或重命名重名项复制
+        elif self.mode == "SKIP" or self.mode == "RENAME":
+            try:
+                self.copy_tree_with_existing(selected_assets_path, dest_assets_path)
+            except Exception as e:
+                self.report({"ERROR"}, f"Assets Merge Failed: {e}")
+                return {"CANCELLED"}
+        else:
+            self.report({"ERROR"}, "Invalid mode")
+            return {"CANCELLED"}
+
+        self.merge_rig_json(os.path.join(selected_config_path, "RigPresets.json"), addon_perefers.rig_preset_json)
+        self.merge_skin_json(os.path.join(selected_config_path, "SkinPresets.json"), addon_perefers.skin_preset_json)
+
+        # 重新加载资产库
+        bpy.ops.cmc.load_library()
 
         return {"FINISHED"}
 
@@ -278,6 +472,8 @@ class CHESTNUTMC_OT_RigImportOperator(bpy.types.Operator):
             self.report({'ERROR'}, "Selected rig path does not exist: {}".format(selected_rig_path))
             return {'CANCELLED'}
 
+        # 选择骨骼名字前缀
+        selected_rig_name = os.path.splitext(context.scene.cmc_rig_list[selected_rig].collection)[0]
 
         # 追加模式：完整复制资源到当前文件
         if addon_prefs.using_mode == 'APPEND':
@@ -286,7 +482,7 @@ class CHESTNUTMC_OT_RigImportOperator(bpy.types.Operator):
                 data_to.collections = data_from.collections
             for coll in data_to.collections:
                 # 验证集合名称
-                if coll.name.startswith(context.scene.cmc_rig_list[selected_rig].collection):
+                if coll.name.startswith(selected_rig_name):
                     context.scene.collection.children.link(coll)
                     break
         # 关联模式：创建外部文件链接
@@ -296,7 +492,7 @@ class CHESTNUTMC_OT_RigImportOperator(bpy.types.Operator):
                 data_to.collections = data_from.collections
             for coll in data_to.collections:
                 # 验证集合名称
-                if coll.name.startswith(context.scene.cmc_rig_list[selected_rig].collection):
+                if coll.name.startswith(selected_rig_name):
                     context.scene.collection.children.link(coll)
                     break
             # 创建库重写
@@ -331,7 +527,12 @@ class CHESTNUTMC_OT_UpdateRigPreview(bpy.types.Operator):
 
         # 获取选中人模
         selected_rig = context.scene.cmc_rig_previews
-        preview_name = context.scene.cmc_rig_list[selected_rig].preview
+        rig_json = read_rig_json(self)
+        for item, value in rig_json.items():
+            if value['name'] == selected_rig:
+                selected_rig = item
+                break
+        preview_name = os.path.splitext(rig_json[selected_rig]['name'])[0] + '.png'
 
         output_path = os.path.join(addon_prefs.rig_preview_path, preview_name)
 
@@ -362,8 +563,8 @@ class CHESTNUTMC_OT_UpdateRigPreview(bpy.types.Operator):
         context.space_data.overlay.show_overlays = original_show_overlays
         context.space_data.lens = original_lens
 
-        #加载rig预览
-        Load_rig_previews()
+        # 重新加载资产库
+        bpy.ops.cmc.load_library()
 
         self.report({'INFO'}, "Rig Preview updated.")
 
@@ -427,8 +628,6 @@ class CHESTNUTMC_OT_RigSave(bpy.types.Operator):
 
         new_preset = {
             "name": self.rigname,
-            "path": filename,
-            "preview": filename.replace(".blend", ".png"),
             "collection": new_coll_name,
         }
 

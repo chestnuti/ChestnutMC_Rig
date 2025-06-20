@@ -58,7 +58,6 @@ def enum_previews_from_rig_previews(self, context):
 
     for i, filepath in enumerate(files_path):
         # generates a thumbnail preview for a file.
-        file = os.path.basename(filepath)
         name = names[i]
         icon = pcoll.get(name)
         if not icon:
