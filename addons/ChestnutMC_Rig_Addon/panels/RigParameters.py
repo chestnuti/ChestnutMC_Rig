@@ -21,15 +21,8 @@ Face_Parameters_nodes = {
 
 # 骨骼参数绘制方法
 def get_rig_parameters(box, context: bpy.types.Context, bone_name: str):
-    # 验证活动物体为骨骼
-    armature = None
-    if context.active_object.type != "ARMATURE":
-        if context.active_object.parent is not None and context.active_object.parent.type == "ARMATURE":
-            armature = context.active_object.parent
-    elif context.active_object.type == "ARMATURE":
-        armature = context.active_object
-    if armature is None:
-        return None
+    # 获取cmcrig
+    armature = AddonOperators.get_cmc_rig(context.active_object)
 
     # 验证骨骼是否存在
     try:
@@ -89,35 +82,14 @@ def get_rig_parameters(box, context: bpy.types.Context, bone_name: str):
 # 面部参数绘制方法
 def get_face_parameters(box, context: bpy.types.Context, material_name: str):
     material = None
-    # 验证活动物体是否为mesh
-    if context.active_object.type == 'MESH':
-        # 验证名称前缀是否为"preview"
-        if context.active_object.name.startswith("preview"):
-            for material in context.active_object.material_slots:
+
+    armature = AddonOperators.get_cmc_rig(context.active_object)
+    for child in armature.children:
+        if child.type == 'MESH' and child.name.startswith("preview"):
+            for material in child.material_slots:
                 if material.material.name.startswith(material_name):
                     material = material.material
                     break
-        else:
-            # 获取父级骨骼
-            parent_armature = None
-            if context.active_object.parent is not None:
-                parent_armature = context.active_object.parent
-                if parent_armature and parent_armature.type == 'ARMATURE':
-                    # 获取父级骨骼中名为"preview"的子物体
-                    for child in parent_armature.children:
-                        if child.type == 'MESH' and child.name.startswith("preview"):
-                            for material in child.material_slots:
-                                if material.material.name.startswith(material_name):
-                                    material = material.material
-                                    break
-    elif context.active_object.type == 'ARMATURE':
-        # 获取骨骼中名为"preview"的子物体
-        for child in context.active_object.children:
-            if child.type == 'MESH' and child.name.startswith("preview"):
-                for material in child.material_slots:
-                    if material.material.name.startswith(material_name):
-                        material = material.material
-                        break
 
     if material is None:
         return None
@@ -146,7 +118,7 @@ def get_face_parameters(box, context: bpy.types.Context, material_name: str):
                         newbox.template_node_view(material.node_tree, node, inp)
             # 若为图像节点，则展示节点
             elif node.type == 'TEX_IMAGE':
-                newbox.prop(node, "image")
+                newbox.template_image(node, "image", node.image_user)
             # 如果节点无输入则进入节点组(Adjuster)
             else:
                 node_tree = bpy.data.node_groups.get(node.node_tree.name)

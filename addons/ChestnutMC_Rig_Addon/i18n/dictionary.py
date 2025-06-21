@@ -14,6 +14,7 @@ dictionary = {
         ("*", "Append"): "追加",
         ("*", "Link(Override)"): "关联（库重写）",
         ("*", "Select Skin"): "选择皮肤",
+        ("*", "Select Rig"): "选择人模",
         # This is not a standard way to define a translation, but it is still supported with preprocess_dictionary.
         "Boolean Config": "布尔参数",
         "Second Panel": "第二面板",

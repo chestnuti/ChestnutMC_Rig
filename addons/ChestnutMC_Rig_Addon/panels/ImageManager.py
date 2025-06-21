@@ -1,5 +1,6 @@
 import bpy
 import os
+import bpy.utils.previews
 
 from ..config import __addon_name__
 from ..preference.AddonPreferences import *

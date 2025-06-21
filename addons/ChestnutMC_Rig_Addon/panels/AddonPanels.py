@@ -157,8 +157,6 @@ class RigPropertiesPanel(BasePanel, bpy.types.Panel):
             box = layout.box()
             get_face_parameters(box, context, "EdgeLight")
 
-
-        #row.prop(node, "ac_expand", icon="TRIA_DOWN" if node.ac_expand else "TRIA_RIGHT", text="", emboss=False)
     @classmethod
     def poll(cls, context: bpy.types.Context):
         if context.mode != "OBJECT" and context.mode != 'POSE':

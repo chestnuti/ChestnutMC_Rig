@@ -532,7 +532,7 @@ class CHESTNUTMC_OT_UpdateRigPreview(bpy.types.Operator):
             if value['name'] == selected_rig:
                 selected_rig = item
                 break
-        preview_name = os.path.splitext(rig_json[selected_rig]['name'])[0] + '.png'
+        preview_name = os.path.splitext(item)[0] + '.png'
 
         output_path = os.path.join(addon_prefs.rig_preview_path, preview_name)
 
