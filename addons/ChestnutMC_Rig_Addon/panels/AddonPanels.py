@@ -99,7 +99,9 @@ class SkinSwapperPanel(BasePanel, bpy.types.Panel):
         if not scene.cmc_skin_list_index >= len(scene.cmc_skin_list):
             column.template_icon(icon_value=skin_previews[scene.cmc_skin_list[scene.cmc_skin_list_index].name].icon_id, scale=4.0)
         layout.operator(CHESTNUTMC_OT_SkinApply.bl_idname, text="Apply Skin", icon='CHECKMARK')
-        layout.operator(CHESTNUTMC_OT_SaveFace2Skin.bl_idname, text="Save Arm and Face to Skin", icon='FILE_NEW')
+        row = layout.row()
+        row.operator(CHESTNUTMC_OT_SaveFace2Skin.bl_idname, text="Save Face to Skin", icon='FILE_NEW')
+        row.operator(CHESTNUTMC_OT_DeleteFace2Skin.bl_idname, text="Delete Face from Skin", icon='TRASH')
 
     @classmethod
     def poll(cls, context: bpy.types.Context):

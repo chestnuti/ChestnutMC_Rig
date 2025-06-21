@@ -77,6 +77,7 @@ def check_cmc_rig(selected_object: bpy.types.Object):
     return False
 
 def get_cmc_rig(selected_object: bpy.types.Object):
+    '''检查选中项是否属于栗籽人模，并返回人模骨架'''
     if check_cmc_rig(selected_object):
         if selected_object.type == 'ARMATURE':
             for child in selected_object.children:
@@ -875,9 +876,12 @@ class CHESTNUTMC_OT_SkinRemove(bpy.types.Operator):
 
         if index >= 0:
             try:
-            # 删除文件夹中的文件
+                # 删除文件夹中的文件
                 skin_path = scene.cmc_skin_list[index].path
                 os.remove(skin_path)
+                # 删除预设
+                if scene.cmc_skin_list[index].have_preset:
+                    bpy.ops.cmc.delete_face2skin()
             except FileNotFoundError:
                 self.report({'INFO'}, f"Skin not found: {skin_path}")
                 return {'CANCELED'}
@@ -1432,6 +1436,60 @@ class CHESTNUTMC_OT_SaveFace2Skin(bpy.types.Operator):
 
         self.report({'ERROR'}, "Failed to save skin preset.")
         return {'CANCELLED'}
+
+
+# 删除脸部预设
+class CHESTNUTMC_OT_DeleteFace2Skin(bpy.types.Operator):
+    bl_idname = "cmc.delete_face2skin"
+    bl_label = "Delete Face to Skin"
+    bl_description = "Delete Face to Skin"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context: bpy.types.Context):
+        selected_skin = context.scene.cmc_skin_list[context.scene.cmc_skin_list_index]
+        # 确保当前活动物体是Armature或Mesh
+        if context.active_object is not None:
+            if check_cmc_rig(context.active_object):
+                if selected_skin.have_preset:
+                    return True
+        return False
+
+    def invoke(self, context: bpy.types.Context, event):
+        selected_skin = context.scene.cmc_skin_list[context.scene.cmc_skin_list_index]
+        context.window_manager.invoke_props_dialog(self, title=f"Are you sure to delete the skin preset: {selected_skin.name}?")
+        return {'RUNNING_MODAL'}
+
+    def execute(self, context):
+        addon_prefs = context.preferences.addons[__addon_name__].preferences
+        scene = context.scene
+        index = scene.cmc_skin_list_index
+        selected_skin = scene.cmc_skin_list[index]
+
+        # 验证是否有脸部预设
+        if scene.cmc_skin_list[index].have_preset:
+            try:
+                skin_presets = read_skin_json(self)
+                if skin_presets is None:
+                    self.report({'ERROR'}, "Failed to load skin presets.")
+                    return {'CANCELLED'}
+                for list, skin_preset in skin_presets.items():
+                    if skin_preset['skin_name'] == selected_skin.name:
+                        # 删除旧预设
+                        del skin_presets[list]
+                        break
+                # 更新预设JSON文件
+                with open(addon_prefs.skin_preset_json, 'w') as f:
+                    json.dump(skin_presets, f, ensure_ascii=False, indent=4)
+            except Exception as e:
+                self.report({'ERROR'}, "Failed to update face preset: {}".format(str(e)))
+                return {'CANCELLED'}
+
+        # 重载皮肤预览图
+        selected_skin.have_preset = False
+        Load_skin_previews()
+
+        return {'FINISHED'}
 
 
 
