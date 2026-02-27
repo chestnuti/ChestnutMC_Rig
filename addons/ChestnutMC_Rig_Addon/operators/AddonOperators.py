@@ -805,6 +805,9 @@ class CHESTNUTMC_OT_SwitchTo128(bpy.types.Operator):
                                 return {'CANCELLED'}
                             return {'FINISHED'}
 
+                    self.report({'WARNING'}, "Connot subdivide Rig!")
+                    return {'FINISHED'}
+
             self.report({'ERROR'}, "Connot find Geometry Node modifier!")
             return {'CANCELLED'}
 
@@ -851,7 +854,7 @@ class CHESTNUTMC_OT_SkinAdd(bpy.types.Operator):
             self.report({'ERROR'}, "Skin already exists: {}".format(os.path.basename(self.filepath)))
             return {'CANCELLED'}
         # 将皮肤拷贝到资产库中
-        os.system(f'copy "{self.filepath}" "{dest}"')
+        shutil.copy2(self.filepath, dest)
         self.report({'INFO'}, f"Skin saved to: {dest}")
 
         # 添加列表
